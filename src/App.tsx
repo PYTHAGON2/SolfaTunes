@@ -26,6 +26,7 @@ import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 import { SettingsModal } from './components/SettingsModal';
 import { CommandPalette, WorkspaceMode } from './components/CommandPalette';
 import { loadAppSettings, saveAppSettings, AppSettings } from './utils/settings';
+import { Tooltip } from './components/Tooltip';
 
 export default function App() {
   // 1. App States & Persistent User Settings
@@ -537,22 +538,25 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleUpdateSettings({ ...settings, zenMode: false })}
-              className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-stone-200 text-xs font-bold transition-colors cursor-pointer"
-              title="Exit Zen / Focus Mode (Z)"
-            >
-              Exit Zen Mode (Z)
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-stone-300 hover:text-white transition-colors cursor-pointer"
-              title="Settings (Cmd+,)"
-            >
-              <Settings size={14} />
-            </button>
+            <Tooltip content="Exit Zen Mode" shortcut="Z" description="Restore standard studio workspace panels" side="bottom">
+              <button
+                type="button"
+                onClick={() => handleUpdateSettings({ ...settings, zenMode: false })}
+                className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-stone-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Exit Zen Mode (Z)
+              </button>
+            </Tooltip>
+            <Tooltip content="Settings" shortcut="⌘," description="Configure visual and playback options" side="bottom">
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-stone-300 hover:text-white transition-colors cursor-pointer"
+                aria-label="Settings"
+              >
+                <Settings size={14} />
+              </button>
+            </Tooltip>
           </div>
         </header>
       ) : (
@@ -580,86 +584,96 @@ export default function App() {
               className="hidden"
               aria-label="Import MusicXML file"
             />
-            <button
-              type="button"
-              onClick={() => musicXmlInputRef.current?.click()}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-              title="Open MusicXML project"
-              aria-label="Open MusicXML project"
-            >
-              <FileUp size={16} />
-              <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleExportMusicXml}
-              disabled={!musicalDocument}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
-              title="Save project as MusicXML"
-              aria-label="Save project as MusicXML"
-            >
-              <FileDown size={16} />
-              <span className="hidden sm:inline text-xs font-semibold">Save project</span>
-            </button>
-            <button
-              onClick={handleExportAbc}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-              title="Download ABC notation"
-              aria-label="Download ABC notation"
-            >
-              <FileDown size={16} />
-              <span className="hidden sm:inline text-xs font-semibold">ABC</span>
-            </button>
-            <button
-              onClick={handleExportMidi}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-              title="Export MIDI"
-              aria-label="Export MIDI"
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
-            </button>
+            <Tooltip content="Open MusicXML" description="Import existing .xml or .musicxml sheet file" side="bottom">
+              <button
+                type="button"
+                onClick={() => musicXmlInputRef.current?.click()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                aria-label="Open MusicXML project"
+              >
+                <FileUp size={16} />
+                <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip content="Save MusicXML" description="Export project as standard MusicXML notation" side="bottom">
+              <button
+                type="button"
+                onClick={handleExportMusicXml}
+                disabled={!musicalDocument}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Save project as MusicXML"
+              >
+                <FileDown size={16} />
+                <span className="hidden sm:inline text-xs font-semibold">Save project</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip content="Export ABC" description="Download score in standard ABC text format" side="bottom">
+              <button
+                onClick={handleExportAbc}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                aria-label="Download ABC notation"
+              >
+                <FileDown size={16} />
+                <span className="hidden sm:inline text-xs font-semibold">ABC</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip content="Export MIDI" description="Generate .mid audio file for DAWs or media players" side="bottom">
+              <button
+                onClick={handleExportMidi}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                aria-label="Export MIDI"
+              >
+                <Download size={16} />
+                <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
+              </button>
+            </Tooltip>
 
             {/* Quick Actions Command Palette Button */}
-            <button
-              type="button"
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
-              title="Command Palette (Cmd+K)"
-              aria-label="Command Palette"
-            >
-              <Command size={15} />
-              <span className="hidden md:inline text-xs font-semibold">Commands</span>
-              <kbd className="hidden lg:inline text-[9px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
-            </button>
+            <Tooltip content="Command Palette" shortcut="⌘K" description="Fast search and shortcut palette" side="bottom">
+              <button
+                type="button"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
+                aria-label="Command Palette"
+              >
+                <Command size={15} />
+                <span className="hidden md:inline text-xs font-semibold">Commands</span>
+                <kbd className="hidden lg:inline text-[9px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
+              </button>
+            </Tooltip>
 
             {/* Complete Full Screen Button */}
-            <button
-              type="button"
-              onClick={handleToggleFullscreen}
-              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border px-3 transition-colors cursor-pointer shadow-sm ${
-                isFullscreen
-                  ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)]'
-                  : 'border-white/10 bg-white/5 text-stone-300 hover:bg-white/10 hover:text-white'
-              }`}
-              title={isFullscreen ? 'Exit Full Screen (Esc or F)' : 'Complete Full Screen (F)'}
-              aria-label="Toggle Full Screen"
-            >
-              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              <span className="hidden sm:inline text-xs font-semibold">{isFullscreen ? 'Exit Full' : 'Full Screen'}</span>
-            </button>
+            <Tooltip content={isFullscreen ? 'Exit Full Screen' : 'Full Screen'} shortcut="F" description="Expand workspace to maximum viewport" side="bottom">
+              <button
+                type="button"
+                onClick={handleToggleFullscreen}
+                className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border px-3 transition-colors cursor-pointer shadow-sm ${
+                  isFullscreen
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)]'
+                    : 'border-white/10 bg-white/5 text-stone-300 hover:bg-white/10 hover:text-white'
+                }`}
+                aria-label="Toggle Full Screen"
+              >
+                {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                <span className="hidden sm:inline text-xs font-semibold">{isFullscreen ? 'Exit Full' : 'Full Screen'}</span>
+              </button>
+            </Tooltip>
 
             {/* Global Settings Menu Button */}
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
-              title="Open Workspace Settings (Cmd+,)"
-              aria-label="Settings"
-            >
-              <Settings size={16} />
-              <span className="hidden sm:inline text-xs font-semibold">Settings</span>
-            </button>
+            <Tooltip content="Workspace Settings" shortcut="⌘," description="Customize display, notation, and playback defaults" side="bottom">
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
+                aria-label="Settings"
+              >
+                <Settings size={16} />
+                <span className="hidden sm:inline text-xs font-semibold">Settings</span>
+              </button>
+            </Tooltip>
           </div>
         </header>
       )}
@@ -749,6 +763,10 @@ export default function App() {
               onUpdateSettings={handleUpdateSettings}
               isFullscreen={isFullscreen}
               onToggleFullscreen={handleToggleFullscreen}
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
             />
           </div>
         </div>
@@ -808,6 +826,10 @@ export default function App() {
               onUpdateSettings={handleUpdateSettings}
               isFullscreen={isFullscreen}
               onToggleFullscreen={handleToggleFullscreen}
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
             />
           </div>
         </main>

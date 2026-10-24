@@ -19,6 +19,9 @@ export interface FlatPianoRollNote {
   rawAccidental?: string;
   octaveNum?: number;
   scaleDegree?: number;
+  octaveRelativeToVoice?: number;
+  measureNumber?: number;
+  beatInMeasure?: number;
 }
 
 export interface MeasureGridInfo {
@@ -250,6 +253,58 @@ export function getPitchSemantics(
 }
 
 /**
+ * Returns a human-friendly duration name for sixteenth ticks.
+ */
+export function getNoteDurationLabel(ticks: number): string {
+  switch (ticks) {
+    case 2:
+      return 'Thirty-second note (1/32)';
+    case 4:
+      return 'Sixteenth note (1/16)';
+    case 6:
+      return 'Dotted sixteenth note';
+    case 8:
+      return 'Eighth note (1/8)';
+    case 12:
+      return 'Dotted eighth note';
+    case 16:
+      return 'Quarter note (1/4)';
+    case 24:
+      return 'Dotted quarter note';
+    case 32:
+      return 'Half note (1/2)';
+    case 48:
+      return 'Dotted half note';
+    case 64:
+      return 'Whole note (1)';
+    default:
+      if (ticks % 16 === 0) return `${ticks / 16} beats`;
+      return `${ticks} ticks`;
+  }
+}
+
+/**
+ * Formats a Sol-fa syllable with octave accents (e.g. d', d'', s,).
+ */
+export function formatSolfaOctaveLabel(syllable: string, octaveRel?: number): string {
+  if (!octaveRel) return syllable;
+  if (octaveRel === 1) return `${syllable}′`;
+  if (octaveRel === 2) return `${syllable}″`;
+  if (octaveRel > 2) return `${syllable}(+${octaveRel})`;
+  if (octaveRel === -1) return `${syllable}₁`;
+  if (octaveRel === -2) return `${syllable}₂`;
+  return `${syllable}(${octaveRel})`;
+}
+
+/**
+ * Calculates frequency in Hz for standard 12-TET A4=440Hz.
+ */
+export function midiToFrequency(midiPitch: number): number {
+  return Math.round(440 * Math.pow(2, (midiPitch - 69) / 12) * 10) / 10;
+}
+
+
+/**
  * Extracts all notes from ParsedScore into a flat array of PianoRollNotes.
  */
 export function flattenScoreToPianoRoll(score: ParsedScore): {
@@ -290,9 +345,11 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
         if (vl && vl.measures[mIdx]) {
           const m = vl.measures[mIdx];
           let noteOffset = 0;
+          const beatTicks = getMeterBeatTicks(score.meter);
           m.notes.forEach((n, nIdx) => {
             const dur = Math.max(1, n.durationTicks || 16);
             const start = currentMeasureStart + noteOffset;
+            const beatInMeasure = Math.floor(noteOffset / Math.max(1, beatTicks)) + 1;
             noteOffset += dur;
             const end = start + dur;
             if (end > maxTick) maxTick = end;
@@ -309,6 +366,9 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
               rawAccidental: n.rawAccidental,
               octaveNum: n.octaveNum,
               scaleDegree: n.scaleDegree,
+              octaveRelativeToVoice: n.octaveRelativeToVoice,
+              measureNumber: globalMeasureIdx + 1,
+              beatInMeasure,
             });
           });
         }

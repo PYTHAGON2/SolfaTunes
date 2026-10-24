@@ -178,4 +178,22 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(sLine.measures.length).toBeGreaterThan(0);
     expect(sLine.measures[0].notes.length).toBeGreaterThan(0);
   });
+
+  it('correctly formats note duration labels and sol-fa octave accents', async () => {
+    const { getNoteDurationLabel, formatSolfaOctaveLabel, midiToFrequency } = await import('./piano_roll_adapter');
+    expect(getNoteDurationLabel(4)).toBe('Sixteenth note (1/16)');
+    expect(getNoteDurationLabel(8)).toBe('Eighth note (1/8)');
+    expect(getNoteDurationLabel(16)).toBe('Quarter note (1/4)');
+    expect(getNoteDurationLabel(32)).toBe('Half note (1/2)');
+    expect(getNoteDurationLabel(64)).toBe('Whole note (1)');
+
+    expect(formatSolfaOctaveLabel('d', 0)).toBe('d');
+    expect(formatSolfaOctaveLabel('d', 1)).toBe('d′');
+    expect(formatSolfaOctaveLabel('d', 2)).toBe('d″');
+    expect(formatSolfaOctaveLabel('s', -1)).toBe('s₁');
+    expect(formatSolfaOctaveLabel('s', -2)).toBe('s₂');
+
+    expect(midiToFrequency(69)).toBe(440); // A4
+    expect(midiToFrequency(60)).toBeCloseTo(261.6, 1); // C4
+  });
 });
