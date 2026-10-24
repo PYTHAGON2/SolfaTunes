@@ -149,6 +149,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     const { notes: flatNotes } = flattenScoreToPianoRoll(score);
     setNotes(flatNotes);
     setHasUncommittedChanges(false);
+    // Format rebuilds note ids, so a previous selection would point at nothing.
+    setSelectedNoteIds(new Set());
+    setHoveredNote(null);
   }, [score]);
 
   // Containers and refs
@@ -212,14 +215,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     [playerRef]
   );
 
-  // Center vertical scroll to middle vocal range (e.g. C4 = 60) on initial render
+  // Center on middle C once, when the roll first has notes. Later row-height
+  // changes must not yank the viewport back.
+  const didCenterRef = useRef(false);
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const c4Y = (maxMidi - 60) * rowHeight;
-      const targetScroll = Math.max(0, c4Y - scrollContainerRef.current.clientHeight / 2 + 60);
-      scrollContainerRef.current.scrollTop = targetScroll;
-    }
-  }, [rowHeight, maxMidi]);
+    const el = scrollContainerRef.current;
+    if (didCenterRef.current || !el || notes.length === 0 || el.clientHeight < 40) return;
+    const c4Y = (maxMidi - 60) * rowHeight;
+    el.scrollTop = Math.max(0, c4Y - el.clientHeight / 2 + rowHeight);
+    didCenterRef.current = true;
+  }, [notes.length, rowHeight, maxMidi]);
 
   // -------------------------------------------------------------
   // Auto-Format on Blur Handler
@@ -1454,11 +1459,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 if (note.isRest) return null; // Piano roll notes only display sounding pitches
 
                 const theme = getVoiceTheme(note.voiceId);
+                const isActiveVoice = note.voiceId === activeVoiceId;
                 const isSelected = selectedNoteIds.has(note.id);
                 const isSounding = activeSoundingNoteIds.has(note.id);
 
                 const left = note.startTick * pixelsPerTick;
-                const width = Math.max(16, note.durationTicks * pixelsPerTick);
+                const width = Math.max(3, note.durationTicks * pixelsPerTick);
                 const top = (maxMidi - note.midiPitch) * rowHeight;
                 const height = rowHeight - 2;
 
@@ -1481,14 +1487,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                       setHoveredNote((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
                     }}
                     onMouseLeave={() => setHoveredNote(null)}
-                    className={`group absolute rounded-md border cursor-move transition-all flex items-center justify-between px-1.5 overflow-hidden text-[10px] font-sans font-bold select-none ${
+                    className={`group absolute rounded-md border cursor-move transition-colors flex items-center justify-between px-1.5 overflow-hidden text-[10px] font-sans font-bold select-none ${
                       theme.bgClass
                     } ${
                       isSounding
-                        ? 'ring-2 ring-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.9)] brightness-125 z-20'
+                        ? 'ring-2 ring-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.9)] brightness-125 z-20 opacity-100'
                         : isSelected
-                        ? 'ring-2 ring-white border-white shadow-2xl z-20 brightness-110'
-                        : `${theme.borderClass} opacity-95 shadow-md hover:brightness-105 z-10`
+                        ? 'ring-2 ring-white border-white shadow-2xl z-20 brightness-110 opacity-100'
+                        : isActiveVoice
+                        ? `${theme.borderClass} opacity-100 shadow-md hover:brightness-105 z-10`
+                        : `${theme.borderClass} opacity-35 saturate-50 z-[5] hover:opacity-70`
                     }`}
                     style={{
                       left: `${left}px`,
