@@ -21,7 +21,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp, ChevronRight, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight, Settings, Command, Maximize2, Minimize2, X } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 import { MiniFloatingPlaybackButton } from './components/MiniFloatingPlaybackButton';
 import { SettingsModal } from './components/SettingsModal';
@@ -98,14 +98,14 @@ export default function App() {
 
   // Compute total duration in piano-roll ticks.
   const totalTicks = useMemo(() => {
-    if (!score) return 0;
+    if (!score || !score.voices) return 0;
     let maxTick = 0;
     score.voices.forEach((v) => {
-      score.systems.forEach((sys) => {
-        const line = sys.voices[v.id];
-        if (line) {
+      (score.systems || []).forEach((sys) => {
+        const line = sys?.voices?.[v.id];
+        if (line && line.measures) {
           line.measures.forEach((measure) => {
-            measure.notes.forEach((note) => {
+            (measure.notes || []).forEach((note) => {
               const end = note.timestamp + note.durationTicks;
               if (end > maxTick) {
                 maxTick = end;
@@ -129,7 +129,34 @@ export default function App() {
     };
   }, []);
 
-  // Global keyboard shortcuts: Cmd+K (Palette), Cmd+, (Settings), Z (Zen), F (Fullscreen), Esc (Exit fullscreen)
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const isSettingsOpenRef = useRef(isSettingsOpen);
+  useEffect(() => {
+    isSettingsOpenRef.current = isSettingsOpen;
+  }, [isSettingsOpen]);
+
+  const isCommandPaletteOpenRef = useRef(isCommandPaletteOpen);
+  useEffect(() => {
+    isCommandPaletteOpenRef.current = isCommandPaletteOpen;
+  }, [isCommandPaletteOpen]);
+
+  const handlePlayRef = useRef<() => void>(() => {});
+  const handlePauseRef = useRef<() => void>(() => {});
+
+  // Sync native browser fullscreen change event (e.g. Esc or F11)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Global keyboard shortcuts: Cmd+K (Palette), Cmd+, (Settings), Z (Zen), F (Fullscreen), Esc (Exit modal/fullscreen), Space (Play/Pause)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -153,16 +180,43 @@ export default function App() {
         return;
       }
 
-      // Escape exits fullscreen if active
-      if (e.key === 'Escape' && isFullscreen) {
-        e.preventDefault();
-        handleToggleFullscreen();
+      // Escape key closes open modals first, then exits fullscreen
+      if (e.key === 'Escape') {
+        if (isCommandPaletteOpenRef.current) {
+          e.preventDefault();
+          setIsCommandPaletteOpen(false);
+          return;
+        }
+        if (isSettingsOpenRef.current) {
+          e.preventDefault();
+          setIsSettingsOpen(false);
+          return;
+        }
+        if (isFullscreen) {
+          e.preventDefault();
+          handleToggleFullscreen();
+          return;
+        }
+      }
+
+      // Avoid hijacking browser/OS shortcuts or single-key navigation when typing inside inputs
+      if (isInput || e.ctrlKey || e.metaKey || e.altKey) {
         return;
       }
 
-      // Avoid hijacking browser/OS shortcuts (e.g. Ctrl+Z undo, Ctrl+F find, Alt shortcuts)
-      // or single-key navigation when typing inside input/textarea/select/contentEditable
-      if (isInput || e.ctrlKey || e.metaKey || e.altKey) {
+      // If modals are open, avoid background single-key triggers
+      if (isCommandPaletteOpenRef.current || isSettingsOpenRef.current) {
+        return;
+      }
+
+      // Spacebar plays/pauses playback
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (isPlayingRef.current) {
+          handlePauseRef.current();
+        } else {
+          handlePlayRef.current();
+        }
         return;
       }
 
@@ -276,6 +330,11 @@ export default function App() {
     setIsPlaying(false);
     playerRef.current?.pause();
   };
+
+  useEffect(() => {
+    handlePlayRef.current = handlePlay;
+    handlePauseRef.current = handlePause;
+  });
 
   const handleStop = () => {
     setIsPlaying(false);
@@ -522,7 +581,8 @@ export default function App() {
 
   // Convert transpose values into helpful human-readable key steps
   const getTranspositionLabel = (val: number): string => {
-    if (val === 0) return 'Original Key (C)';
+    const keyName = score?.key || 'C';
+    if (val === 0) return `Original Key (${keyName})`;
     const prefix = val > 0 ? '+' : '';
     const semitones = `${prefix}${val} semitone${Math.abs(val) > 1 ? 's' : ''}`;
     
@@ -707,7 +767,7 @@ export default function App() {
         <div
           role={musicXmlStatus.type === 'error' || musicXmlStatus.type === 'warning' ? 'alert' : 'status'}
           aria-live="polite"
-          className={`border-b px-4 py-2 text-xs ${
+          className={`border-b px-4 py-2 text-xs flex items-center justify-between gap-3 ${
             musicXmlStatus.type === 'error'
               ? 'border-red-400/20 bg-red-950/40 text-red-200'
               : musicXmlStatus.type === 'warning'
@@ -715,7 +775,15 @@ export default function App() {
                 : 'border-emerald-400/20 bg-emerald-950/20 text-emerald-200'
           }`}
         >
-          {musicXmlStatus.message}
+          <span>{musicXmlStatus.message}</span>
+          <button
+            type="button"
+            onClick={() => setMusicXmlStatus(null)}
+            className="p-1 rounded hover:bg-white/10 text-stone-300 hover:text-white transition-colors cursor-pointer shrink-0"
+            aria-label="Dismiss alert"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

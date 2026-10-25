@@ -1146,11 +1146,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     onUpdateScore(newScore);
   };
 
-  if (!score) {
+  if (!score || !score.voices || score.voices.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-stone-500 p-8 bg-[#0F1115]">
         <p className="text-xl font-serif italic text-white/40">No score loaded</p>
-        <p className="text-xs text-white/20 mt-1">Enter ABC notation or load an masterpiece on the left.</p>
+        <p className="text-xs text-white/20 mt-1">Enter ABC notation or load a score on the left.</p>
       </div>
     );
   }
@@ -1380,7 +1380,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           {/* Systems Loop */}
           <div className="flex flex-col gap-12 select-none">
             {score.systems.map((system) => {
-              const refVoice = score.voices[0].id;
+              const refVoice = score.voices[0]?.id || '';
               const systemMeasuresCount = Math.max(
                 0,
                 ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
@@ -1448,7 +1448,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                           activeMeasure.systemIndex === system.systemIndex &&
                           activeMeasure.measureIndex === mIndex;
 
-                        const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+                        const barType = (refVoice && system.voices[refVoice]?.barTypes?.[mIndex]) || '|';
 
                         return (
                           <div

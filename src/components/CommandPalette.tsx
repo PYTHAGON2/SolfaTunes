@@ -514,6 +514,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
   };
 
+  // Ensure Escape key always closes Command Palette regardless of focused element
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleWindowKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [isOpen, onClose]);
+
   // Ensure active item is scrolled into view
   useEffect(() => {
     if (!listRef.current) return;
@@ -527,7 +540,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-start justify-center pt-16 sm:pt-24 px-4 pb-6 overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-md flex items-start justify-center pt-16 sm:pt-24 px-4 pb-6 overflow-y-auto animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
