@@ -21,7 +21,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp, ChevronRight, ChevronDown, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight, ChevronDown, Settings, Command, Maximize2, Minimize2, FileMusic } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 import { MiniFloatingPlaybackButton } from './components/MiniFloatingPlaybackButton';
 import { SettingsModal } from './components/SettingsModal';
@@ -35,6 +35,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [mobileTab, setMobileTab] = useState<'score' | 'library'>('score');
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
@@ -343,6 +344,10 @@ export default function App() {
     if (song.format === 'musicxml') {
       try {
         handleLoadMusicXmlText(await song.loadXml(), song.id);
+        setMobileTab('score');
+        if (window.matchMedia('(max-width: 1023px)').matches) {
+          scoreContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         setMusicXmlStatus({
@@ -360,6 +365,7 @@ export default function App() {
     setAbcText(song.abcText);
     setAbcLoadVersion(version => version + 1);
     setSelectedNote(null);
+    setMobileTab('score');
     if (window.matchMedia('(max-width: 1023px)').matches) {
       scoreContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -905,34 +911,76 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
-          {/* Collapsible Sidebar on Left (controlled by settings.showSidebar) */}
-          {settings.showSidebar && !settings.zenMode ? (
-            <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200">
-              <Sidebar
-                onLoadAbcText={handleLoadAbcText}
-                warnings={warnings}
-                onLoadScore={handleLoadScore}
-                selectedScoreId={selectedScoreId}
-                onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
-              />
+        <>
+          {/* Mobile Tab Switcher (visible on screens < lg) */}
+          {!settings.zenMode && (
+            <div className="lg:hidden px-3 pt-3 flex items-center justify-between gap-2 shrink-0">
+              <div className="inline-flex rounded-xl bg-[#13161C] border border-white/10 p-1 w-full shadow-md">
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('score')}
+                  className={`flex-1 min-h-[40px] rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    mobileTab === 'score'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                  aria-pressed={mobileTab === 'score'}
+                >
+                  <Music size={15} />
+                  <span>Sheet Music</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('library')}
+                  className={`flex-1 min-h-[40px] rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    mobileTab === 'library'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                  aria-pressed={mobileTab === 'library'}
+                >
+                  <FileMusic size={15} />
+                  <span>Score Library ({SCORES.length})</span>
+                </button>
+              </div>
             </div>
-          ) : !settings.zenMode ? (
-            <button
-              type="button"
-              onClick={() => handleUpdateSettings({ ...settings, showSidebar: true })}
-              className="order-2 lg:order-1 self-start lg:self-stretch flex items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 lg:w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
-              title="Expand score library"
-            >
-              <ChevronRight size={16} />
-              <span className="text-[11px] font-bold uppercase tracking-wider lg:[writing-mode:vertical-rl] lg:rotate-180">
-                Library
-              </span>
-            </button>
-          ) : null}
+          )}
 
-          {/* Score Area */}
-          <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
+          <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
+            {/* Collapsible Sidebar on Left (controlled by settings.showSidebar on desktop, or mobileTab on mobile) */}
+            {settings.showSidebar && !settings.zenMode ? (
+              <div className={`min-w-0 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200 ${
+                mobileTab === 'library' ? 'block w-full h-[75vh]' : 'hidden lg:block'
+              }`}>
+                <Sidebar
+                  onLoadAbcText={handleLoadAbcText}
+                  warnings={warnings}
+                  onLoadScore={handleLoadScore}
+                  selectedScoreId={selectedScoreId}
+                  onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
+                />
+              </div>
+            ) : !settings.zenMode ? (
+              <button
+                type="button"
+                onClick={() => handleUpdateSettings({ ...settings, showSidebar: true })}
+                className="hidden lg:flex self-stretch items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
+                title="Expand score library"
+              >
+                <ChevronRight size={16} />
+                <span className="text-[11px] font-bold uppercase tracking-wider [writing-mode:vertical-rl] rotate-180">
+                  Library
+                </span>
+              </button>
+            ) : null}
+
+            {/* Score Area */}
+            <div
+              ref={scoreContainerRef}
+              className={`min-w-0 h-[75vh] min-h-[32rem] scroll-mt-3 lg:flex-1 lg:h-full lg:min-h-0 ${
+                mobileTab === 'score' ? 'block' : 'hidden lg:block'
+              }`}
+            >
             <ScoreRenderer
               score={score}
               abcText={abcText}
@@ -969,6 +1017,7 @@ export default function App() {
             />
           </div>
         </main>
+      </>
       )}
 
       {/* Unified Floating Playback Dock ("Always Within Reach" - hideable in Settings & Zen Mode, hidden in Fullscreen) */}

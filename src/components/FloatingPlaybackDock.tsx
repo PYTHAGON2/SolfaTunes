@@ -100,25 +100,33 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
     };
   }, [score, currentTick]);
 
-  // Handle clicking or dragging on progress bar to scrub
-  const calculateTickFromMouseEvent = (e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
+  // Handle clicking or dragging on progress bar to scrub (mouse & mobile touch)
+  const calculateTickFromClientX = (clientX: number) => {
     if (!progressBarRef.current || totalTicks <= 0) return 0;
     const rect = progressBarRef.current.getBoundingClientRect();
-    const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const clickX = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const fraction = clickX / rect.width;
     return Math.round(fraction * totalTicks);
   };
 
   const handleProgressBarMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsDragging(true);
-    const targetTick = calculateTickFromMouseEvent(e);
+    const targetTick = calculateTickFromClientX(e.clientX);
     onSeek(targetTick);
+  };
+
+  const handleProgressBarTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 0) {
+      setIsDragging(true);
+      const targetTick = calculateTickFromClientX(e.touches[0].clientX);
+      onSeek(targetTick);
+    }
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        const targetTick = calculateTickFromMouseEvent(e);
+        const targetTick = calculateTickFromClientX(e.clientX);
         onSeek(targetTick);
       }
     };
@@ -129,14 +137,33 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
       }
     };
 
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging && e.touches.length > 0) {
+        const targetTick = calculateTickFromClientX(e.touches[0].clientX);
+        onSeek(targetTick);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (isDragging) {
+        setIsDragging(false);
+      }
+    };
+
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: true });
+      window.addEventListener('touchend', handleTouchEnd);
+      window.addEventListener('touchcancel', handleTouchEnd);
     }
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [isDragging, totalTicks]);
 
@@ -221,13 +248,26 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
             {/* Mini Progress Bar in Collapsed mode */}
             <Tooltip content="Scrub Timeline" description="Click anywhere to jump playback position" side="top">
               <div
-                className="flex-1 max-w-md h-1.5 bg-black/60 rounded-full overflow-hidden cursor-pointer relative"
-                onClick={handleProgressBarMouseDown}
+                className="flex-1 max-w-md h-6 flex items-center cursor-pointer relative"
+                onClick={(e) => {
+                  if (totalTicks <= 0) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const fraction = Math.max(0, Math.min(e.clientX - rect.left, rect.width)) / rect.width;
+                  onSeek(Math.round(fraction * totalTicks));
+                }}
+                onTouchStart={(e) => {
+                  if (totalTicks <= 0 || !e.touches.length) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const fraction = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width)) / rect.width;
+                  onSeek(Math.round(fraction * totalTicks));
+                }}
               >
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400"
-                  style={{ width: `${progressPercent}%` }}
-                />
+                <div className="w-full h-1.5 bg-black/60 rounded-full overflow-hidden relative">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
             </Tooltip>
 
@@ -250,12 +290,13 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
           </div>
         ) : (
           /* FULL EXPANDED DOCK */
-          <div className="p-3 md:p-4 flex flex-col gap-3">
+          <div className="p-3 md:p-4 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
             {/* Top Row: Timeline Scrubber Bar with Measure markers and Hover Tooltip */}
             <div className="flex flex-col gap-1 select-none">
               <div
                 ref={progressBarRef}
                 onMouseDown={handleProgressBarMouseDown}
+                onTouchStart={handleProgressBarTouchStart}
                 onMouseMove={handleProgressBarHover}
                 onMouseLeave={handleProgressBarLeave}
                 className="relative w-full h-3 bg-black/60 hover:h-4.5 rounded-full cursor-pointer transition-all duration-150 group border border-white/5"

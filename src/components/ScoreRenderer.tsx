@@ -31,6 +31,8 @@ import {
   Maximize2,
   Minimize2,
   Columns,
+  Smartphone,
+  MoreHorizontal,
 } from 'lucide-react';
 import { PianoRoll } from './PianoRoll';
 import { MidiPlayer } from '../audio/midi_player';
@@ -1081,6 +1083,83 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
   };
 
+  // Landscape orientation prompt on mobile
+  const [showLandscapePrompt, setShowLandscapePrompt] = useState(false);
+  const [dismissedLandscapePrompt, setDismissedLandscapePrompt] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const isMobileWidth = window.innerWidth < 768;
+      const isPortrait = window.innerHeight > window.innerWidth;
+      setShowLandscapePrompt(isMobileWidth && isPortrait && !dismissedLandscapePrompt);
+    };
+
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, [dismissedLandscapePrompt]);
+
+  // Mobile overflow views dropdown menu
+  const [isMobileViewsMenuOpen, setIsMobileViewsMenuOpen] = useState(false);
+  const mobileViewsMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (mobileViewsMenuRef.current && !mobileViewsMenuRef.current.contains(e.target as Node)) {
+        setIsMobileViewsMenuOpen(false);
+      }
+    };
+    if (isMobileViewsMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+      return () => {
+        document.removeEventListener('mousedown', handleOutsideClick);
+        document.removeEventListener('touchstart', handleOutsideClick);
+      };
+    }
+  }, [isMobileViewsMenuOpen]);
+
+  // Pinch-to-zoom on sheet music touch devices
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartScaleRef = useRef<number>(scale);
+  const [isPinching, setIsPinching] = useState(false);
+
+  const handleScoreTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchStartDistRef.current = dist;
+      pinchStartScaleRef.current = scale;
+      setIsPinching(true);
+    }
+  };
+
+  const handleScoreTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && pinchStartDistRef.current !== null && pinchStartDistRef.current > 0) {
+      const currentDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const ratio = currentDist / pinchStartDistRef.current;
+      const rawNewScale = pinchStartScaleRef.current * ratio;
+      const clampedScale = Math.max(0.6, Math.min(1.8, rawNewScale));
+      setScale(Math.round(clampedScale * 20) / 20);
+    }
+  };
+
+  const handleScoreTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) {
+      pinchStartDistRef.current = null;
+      setIsPinching(false);
+    }
+  };
+
   const layoutRows = useMemo<({ type: 'voice'; voice: any } | { type: 'divider' })[]>(() => {
     if (!score) return [];
     
@@ -1907,12 +1986,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#13151A] border border-white/5 rounded-xl overflow-hidden shadow-2xl">
       {/* Renderer Controls Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 bg-[#0F1115] border-b border-white/5">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-4 px-3 py-3 sm:px-6 sm:py-4 bg-[#0F1115] border-b border-white/5">
         <div>
           <h2 className="text-white font-sans font-black text-xs uppercase tracking-wider">
             Sol-fa Sheet Music
           </h2>
-          <p className="text-[11px] text-stone-400 font-sans mt-0.5">
+          <p className="text-[10px] sm:text-[11px] text-stone-400 font-sans mt-0.5">
             Key: <span className="font-bold text-[#6366F1]">{score.key}</span> | Meter:{' '}
             <span className="font-semibold text-stone-300">{score.meter}</span> | L:{' '}
             <span className="font-semibold text-stone-300">{score.defaultLength}</span>
@@ -1920,9 +1999,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
 
         {/* Workspace Switcher & Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Unified Workspace Segmented Control */}
-          <div className="flex items-center bg-black/50 p-1 rounded-xl border border-white/10 shadow-inner overflow-x-auto max-w-full">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Desktop Full Workspace Segmented Control (hidden on mobile, visible md+) */}
+          <div className="hidden md:flex items-center bg-black/50 p-1 rounded-xl border border-white/10 shadow-inner overflow-x-auto max-w-full">
             <Tooltip content="Score View" description="Clean Tonic Sol-fa performance score layout" side="bottom">
               <button
                 onClick={() => {
@@ -2063,6 +2142,160 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 <span>Source</span>
               </button>
             </Tooltip>
+          </div>
+
+          {/* Mobile Collapsed Workspace Control (visible on < md) */}
+          <div className="flex md:hidden items-center bg-black/50 p-1 rounded-xl border border-white/10 shadow-inner relative" ref={mobileViewsMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
+                setStudioMode('read');
+                onSelectNote(null);
+                setIsMobileViewsMenuOpen(false);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                studioMode === 'read' && !showPianoRoll
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              aria-label="Score View"
+            >
+              <Eye size={12} />
+              <span>Score</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
+                setStudioMode('lyrics');
+                onSelectNote(null);
+                setIsMobileViewsMenuOpen(false);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                studioMode === 'lyrics'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              aria-label="Lyrics View"
+            >
+              <FileText size={12} />
+              <span>Lyrics</span>
+            </button>
+
+            {/* Secondary Views Dropdown */}
+            <button
+              type="button"
+              onClick={() => setIsMobileViewsMenuOpen(prev => !prev)}
+              className={`px-2 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap border-l border-white/10 ml-0.5 ${
+                studioMode !== 'read' && studioMode !== 'lyrics'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              aria-label="More views"
+              aria-expanded={isMobileViewsMenuOpen}
+            >
+              <span>
+                {studioMode === 'pianoroll' ? 'Piano' : studioMode === 'split' ? 'Split' : studioMode === 'interactive' ? 'Edit' : studioMode === 'source' ? 'Source' : 'Views'}
+              </span>
+              <ChevronDown size={11} className={isMobileViewsMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+            </button>
+
+            {/* Mobile Overflow Menu Popover */}
+            {isMobileViewsMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#161822] border border-white/15 rounded-xl shadow-2xl py-1.5 z-50 text-xs text-stone-200 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (solfaEditTimerRef.current) {
+                      clearTimeout(solfaEditTimerRef.current);
+                      solfaEditTimerRef.current = null;
+                    }
+                    isEditingSolfaRef.current = false;
+                    onSelectNote(null);
+                    setStudioMode('pianoroll');
+                    setShowPianoRoll(true);
+                    setIsMobileViewsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    studioMode === 'pianoroll' ? 'bg-indigo-600/30 text-indigo-200 font-bold' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-sm">🎹</span>
+                  <span>Piano Roll</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (solfaEditTimerRef.current) {
+                      clearTimeout(solfaEditTimerRef.current);
+                      solfaEditTimerRef.current = null;
+                    }
+                    isEditingSolfaRef.current = false;
+                    onSelectNote(null);
+                    setStudioMode('split');
+                    setIsMobileViewsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    studioMode === 'split' ? 'bg-indigo-600/30 text-indigo-200 font-bold' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Columns size={14} className="text-indigo-400" />
+                  <span>Split View</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (solfaEditTimerRef.current) {
+                      clearTimeout(solfaEditTimerRef.current);
+                      solfaEditTimerRef.current = null;
+                    }
+                    isEditingSolfaRef.current = false;
+                    setShowPianoRoll(false);
+                    setStudioMode('interactive');
+                    setIsMobileViewsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    studioMode === 'interactive' ? 'bg-indigo-600/30 text-indigo-200 font-bold' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Edit2 size={14} className="text-indigo-400" />
+                  <span>Visual Edit</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPianoRoll(false);
+                    setStudioMode('source');
+                    onSelectNote(null);
+                    if (score && !isEditingSolfaRef.current) {
+                      setSolfaText(serializeScoreToSolfa(score));
+                    }
+                    setIsMobileViewsMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    studioMode === 'source' ? 'bg-indigo-600/30 text-indigo-200 font-bold' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Code size={14} className="text-indigo-400" />
+                  <span>Source Editor</span>
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Zoom Controls */}
@@ -2229,9 +2462,19 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         <div ref={splitContainerRef} className="flex-1 flex flex-col overflow-hidden bg-[#0A0A0B]">
           {/* Top Pane: Sheet Music */}
           <div
-            className="overflow-auto p-4 sm:p-6 pb-12 relative bg-[#0A0A0B]"
+            className="overflow-auto p-3 sm:p-6 pb-12 relative bg-[#0A0A0B]"
             style={{ height: `${splitRatio}%`, minHeight: '140px' }}
+            onTouchStart={handleScoreTouchStart}
+            onTouchMove={handleScoreTouchMove}
+            onTouchEnd={handleScoreTouchEnd}
           >
+            {/* Floating Pinch Scale Badge */}
+            {isPinching && (
+              <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#161822]/95 backdrop-blur-md border border-indigo-500/50 text-white px-3.5 py-1.5 rounded-full text-xs font-mono font-bold shadow-2xl flex items-center gap-2 pointer-events-none animate-in fade-in zoom-in-95">
+                <ZoomIn size={14} className="text-indigo-400 animate-pulse" />
+                <span>Scale: {Math.round(scale * 100)}%</span>
+              </div>
+            )}
             {renderPaperSheet(false)}
           </div>
 
@@ -2704,9 +2947,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       ) : studioMode === 'lyrics' ? (
         /* Hymn Lyrics View */
-        <div className="flex-1 overflow-auto p-8 pb-36 relative bg-[#0A0A0B]">
+        <div className="flex-1 overflow-auto p-3 sm:p-6 md:p-8 pb-36 relative bg-[#0A0A0B]">
           <div
-            className="mx-auto max-w-2xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-10 font-sans relative transition-all overflow-hidden"
+            className="mx-auto max-w-2xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-4 sm:p-8 md:p-10 font-sans relative transition-all overflow-hidden"
             style={{
               transform: `scale(${scale})`,
               transformOrigin: 'top center',
@@ -2799,7 +3042,43 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       ) : (
         /* Sheet Music Visual Area */
-        <div className="flex-1 overflow-auto p-8 pb-36 relative bg-[#0A0A0B]">
+        <div
+          className="flex-1 overflow-auto p-3 sm:p-6 md:p-8 pb-36 relative bg-[#0A0A0B]"
+          onTouchStart={handleScoreTouchStart}
+          onTouchMove={handleScoreTouchMove}
+          onTouchEnd={handleScoreTouchEnd}
+        >
+          {/* Floating Pinch Scale Badge */}
+          {isPinching && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#161822]/95 backdrop-blur-md border border-indigo-500/50 text-white px-3.5 py-1.5 rounded-full text-xs font-mono font-bold shadow-2xl flex items-center gap-2 pointer-events-none animate-in fade-in zoom-in-95">
+              <ZoomIn size={14} className="text-indigo-400 animate-pulse" />
+              <span>Scale: {Math.round(scale * 100)}%</span>
+            </div>
+          )}
+
+          {/* Orientation Suggestion for Mobile Portrait */}
+          {showLandscapePrompt && (
+            <div className="mx-auto max-w-5xl mb-3 bg-gradient-to-r from-indigo-950/70 to-[#13161C] border border-indigo-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2.5 text-xs text-stone-300 shadow-md">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
+                  <Smartphone size={14} className="rotate-90" />
+                </div>
+                <p className="text-[11px] font-sans truncate">
+                  <span className="font-bold text-white">Rotate to landscape</span> for the best 4-part choir layout.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDismissedLandscapePrompt(true)}
+                className="p-1 text-stone-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                aria-label="Dismiss orientation suggestion"
+                title="Dismiss"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {studioMode === 'interactive' && renderNoteInspector()}
           {renderPaperSheet(studioMode === 'interactive')}
         </div>

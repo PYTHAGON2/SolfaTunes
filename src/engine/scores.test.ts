@@ -66,6 +66,22 @@ describe('score fixtures', () => {
     expect(getScoreDisplayTitle(winchester, 'tune')).toBe('Winchester New');
   });
 
+  it('switches between hymn title and tune name for bundled MusicXML scores', () => {
+    const illsley = SCORES.find(score => score.fileName.includes('illsley'));
+    expect(illsley).toBeDefined();
+    if (!illsley) return;
+
+    expect(getScoreDisplayTitle(illsley, 'hymn')).toBe('Now that the daylight fills the sky');
+    expect(getScoreDisplayTitle(illsley, 'tune')).toBe('Illsley');
+
+    const christe = SCORES.find(score => score.fileName.includes('christe_sanctorum'));
+    expect(christe).toBeDefined();
+    if (!christe) return;
+
+    expect(getScoreDisplayTitle(christe, 'hymn')).toBe('LET hearts awaken, now the nigh');
+    expect(getScoreDisplayTitle(christe, 'tune')).toBe('Christe sanctorum');
+  });
+
   it('falls back to the score title when a hymn or tune title is missing', () => {
     const score = {
       id: 'untitled',

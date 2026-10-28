@@ -170,13 +170,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="grid grid-cols-1 gap-2">
               {filteredScores.map(song => {
                 const isSelected = song.id === selectedScoreId;
-                const secondaryTitle = song.format === 'abc'
-                  ? titleMode === 'hymn'
-                    ? (song.hymnName ? song.tuneName || song.title : undefined)
-                    : (song.tuneName ? song.hymnName : undefined)
-                  : undefined;
+                const primaryTitle = getScoreDisplayTitle(song, titleMode);
+                const secondaryTitle = titleMode === 'hymn'
+                  ? (song.tuneName && song.tuneName.toLowerCase() !== primaryTitle.toLowerCase()
+                      ? song.tuneName
+                      : (song.title && song.title.toLowerCase() !== primaryTitle.toLowerCase() ? song.title : undefined))
+                  : (song.hymnName && song.hymnName.toLowerCase() !== primaryTitle.toLowerCase()
+                      ? song.hymnName
+                      : undefined);
                 const scoreFileDescription = song.format === 'musicxml'
-                  ? `MusicXML • ${song.fileName}`
+                  ? `MusicXML • ${song.composer} • ${song.fileName}`
                   : `ABC • ${song.composer} • ${song.fileName}`;
 
                 return (

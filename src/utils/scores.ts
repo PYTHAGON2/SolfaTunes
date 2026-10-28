@@ -64,7 +64,8 @@ function extractMusicXmlMeta(xml: string) {
         .replace(/&quot;/g, '"')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>');
+        .replace(/&gt;/g, '>')
+        .replace(/&apos;/g, "'");
       const parsed = JSON.parse(decoded);
       if (parsed.hymnMeter) hymnMeter = parsed.hymnMeter;
       if (parsed.hymnName) hymnName = parsed.hymnName;
@@ -86,14 +87,24 @@ function extractMusicXmlMeta(xml: string) {
     if (tNameMatch) tuneName = tNameMatch[1].trim();
   }
 
-  // 3. Time meter
+  // 3. Fallback tuneName from work-title or movement-title
+  if (!tuneName) {
+    const workTitleMatch = xml.match(/<work-title>([\s\S]*?)<\/work-title>/i);
+    const movementTitleMatch = xml.match(/<movement-title>([\s\S]*?)<\/movement-title>/i);
+    const titleMatch = (workTitleMatch?.[1] || movementTitleMatch?.[1])?.trim();
+    if (titleMatch) {
+      tuneName = titleMatch;
+    }
+  }
+
+  // 4. Time meter
   const beats = xml.match(/<beats>(\d+)<\/beats>/)?.[1];
   const beatType = xml.match(/<beat-type>(\d+)<\/beat-type>/)?.[1];
   if (beats && beatType) {
     timeMeter = `${beats}/${beatType}`;
   }
 
-  // 4. Composer
+  // 5. Composer
   const creatorMatch = xml.match(/<creator type="composer">([^<]+)<\/creator>/);
   if (creatorMatch) {
     composer = creatorMatch[1].trim();
@@ -143,18 +154,19 @@ export function createMusicXmlScoreLibraryItem(
   const meta: Partial<ReturnType<typeof extractMusicXmlMeta>> = rawXml
     ? extractMusicXmlMeta(rawXml)
     : {};
-  const hymnMeter = meta.hymnMeter || getStandardHymnMeter(meta.tuneName || fileTitle);
+  const tuneName = meta.tuneName || fileTitle;
+  const hymnMeter = meta.hymnMeter || getStandardHymnMeter(tuneName);
 
   return {
     id: `musicxml:${fileName.replace(/\.(?:xml|musicxml)$/i, '')}`,
     fileName,
     format: 'musicxml',
-    title: fileTitle,
+    title: tuneName,
     composer: meta.composer || 'MusicXML project',
     hymnMeter,
     timeMeter: meta.timeMeter,
     hymnName: meta.hymnName,
-    tuneName: meta.tuneName,
+    tuneName,
     loadXml,
   };
 }
@@ -192,6 +204,8 @@ export function getScoreDisplayTitle(
   score: ScoreLibraryItem,
   mode: ScoreTitleMode
 ): string {
-  if (score.format === 'musicxml') return score.title;
-  return mode === 'hymn' ? score.hymnName || score.title : score.tuneName || score.title;
+  if (mode === 'hymn') {
+    return score.hymnName || score.tuneName || score.title;
+  }
+  return score.tuneName || score.title;
 }
